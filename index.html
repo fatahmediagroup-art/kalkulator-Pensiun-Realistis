@@ -1,11 +1,473 @@
-<script>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator PRea — Pensiun Realistis</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF for Executive Summary PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            background-color: #F0EEE6;
+            color: #1A1A1A;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-0 sm:p-4">
+
+    <div class="w-full max-w-[430px] min-h-screen sm:min-h-[850px] bg-white sm:rounded-3xl shadow-xl flex flex-col overflow-hidden relative" 
+         x-data="preaCalculator()">
+
+        <!-- ========================================== -->
+        <!-- GERBANG KEAMANAN / KODE AKSES (LOCKED GATE) -->
+        <!-- ========================================== -->
+        <template x-if="!isUnlocked">
+            <div class="absolute inset-0 z-50 bg-[#F0EEE6] flex flex-col items-center justify-center p-6 text-center">
+                <div class="bg-white w-full max-w-sm p-8 rounded-2xl shadow-lg border border-[#E2DCCD]">
+                    <div class="w-16 h-16 bg-[#4A3B32] text-[#F2B01E] rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold shadow-md">
+                        🔒
+                    </div>
+                    <h2 class="text-xl font-bold text-[#4A3B32] mb-2">Akses Eksklusif Pembeli E-Book</h2>
+                    <p class="text-xs text-gray-600 mb-6 leading-relaxed">
+                        Masukkan <strong>Kode Unik / Password</strong> resmi (<strong>prea123</strong>) yang tercantum pada halaman akhir e-book <em>PRea (Pensiun Realistis)</em> Anda untuk membuka kalkulator ini.
+                    </p>
+
+                    <form @submit.prevent="verifyCode" class="space-y-4">
+                        <div>
+                            <input type="password" 
+                                   x-model="inputCode" 
+                                   placeholder="Masukkan Kode Akses..." 
+                                   class="w-full px-4 py-3 border border-[#E2DCCD] rounded-xl text-center font-mono text-lg focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-[#F0EEE6]/30">
+                        </div>
+
+                        <template x-if="codeError">
+                            <p class="text-xs text-red-600 font-medium">⚠️ Kode akses salah! Gunakan: prea123</p>
+                        </template>
+
+                        <button type="submit" 
+                                class="w-full py-3 bg-[#4A3B32] text-[#F2B01E] font-bold rounded-xl hover:bg-[#1A1A1A] transition shadow-md">
+                            Buka Kalkulator PRea
+                        </button>
+                    </form>
+                    
+                    <p class="text-[10px] text-gray-400 mt-6">
+                        Sahabat Pensiun &copy; 2026 — PRea Digital Systems
+                    </p>
+                </div>
+            </div>
+        </template>
+
+        <!-- ========================================== -->
+        <!-- KONTEN UTAMA APLIKASI (SETELAH UNLOCKED) -->
+        <!-- ========================================== -->
+        <!-- Header Brand -->
+        <header class="bg-[#4A3B32] text-[#F0EEE6] px-6 py-4 flex items-center justify-between shadow-md">
+            <div>
+                <span class="text-[10px] tracking-widest text-[#F2B01E] uppercase font-bold">Eksklusif Bonus E-Book</span>
+                <h1 class="text-lg font-bold">Kalkulator PRea</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-xs bg-[#F2B01E] text-[#1A1A1A] px-2.5 py-1 rounded-full font-bold">v2.6</span>
+                <button @click="lockApp" title="Kunci Kembali" class="text-xs text-[#E2DCCD] hover:text-white px-2 py-1 bg-white/10 rounded-lg">🔒</button>
+            </div>
+        </header>
+
+        <!-- Tab Navigation Bar -->
+        <nav class="bg-[#E2DCCD] px-2 py-2 flex justify-around text-xs font-semibold overflow-x-auto space-x-1 shadow-inner">
+            <template x-for="(tabName, index) in ['1. Identitas', '2. Cek Kesehatan', '3. Kebutuhan', '4. Kesiapan', '5. Strategi', '6. Kesimpulan']">
+                <button @click="switchTab(index + 1)"
+                        :class="tab === index + 1 ? 'bg-[#4A3B32] text-[#F2B01E] shadow-sm' : 'text-[#4A3B32] hover:bg-white/50'"
+                        class="px-3 py-2 rounded-xl transition whitespace-nowrap flex-shrink-0"
+                        x-text="tabName">
+                </button>
+            </template>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 p-5 overflow-y-auto space-y-5 pb-20">
+
+            <!-- ================= TAB 1: IDENTITAS ================= -->
+            <div x-show="tab === 1" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Petakan Waktu & Keluarga</h2>
+                    <p class="text-xs text-gray-600">Masukkan data dasar demografi dan target usia pensiun Anda.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-[#4A3B32] mb-1">Nama Anda</label>
+                    <input type="text" x-model="formData.nama" @input="persist" class="w-full px-3 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-white">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-[#4A3B32] mb-1">Jumlah Orang yang Ditanggung (Angka / Org)</label>
+                    <input type="number" x-model.number="formData.tanggunganOrg" @input="persist" class="w-full px-3 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-white" min="0">
+                    <p class="text-[10px] text-gray-500 mt-1">Multiplier dana darurat: 1-2 org = 3 bln, 3-4 org = 6 bln, >4 org = 12 bln.</p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-[11px] font-bold text-[#4A3B32] mb-1">Usia Saat Ini</label>
+                        <input type="number" x-model.number="formData.usiaSekarang" @input="onAgeChange" class="w-full px-3 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-white text-center">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-[#4A3B32] mb-1">Target Pensiun</label>
+                        <input type="number" x-model.number="formData.targetPensiun" @input="persist" class="w-full px-3 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-white text-center">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-[#4A3B32] mb-1">Harapan Hidup</label>
+                        <input type="number" x-model.number="formData.harapanHidup" @input="persist" class="w-full px-3 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E] bg-white text-center">
+                    </div>
+                </div>
+
+                <!-- Live Preview Kotak Info -->
+                <div class="bg-[#4A3B32] text-[#F0EEE6] p-4 rounded-2xl shadow space-y-2">
+                    <div class="flex justify-between text-xs">
+                        <span>Sisa Waktu Menuju Pensiun:</span>
+                        <strong class="text-[#F2B01E]" x-text="sisaWaktuPensiun + ' Tahun'"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Durasi Masa Pensiun:</span>
+                        <strong class="text-[#F2B01E]" x-text="durasiPensiun + ' Tahun'"></strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 2: CEK KESEHATAN ================= -->
+            <div x-show="tab === 2" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Arus Kas & Skor Finansial</h2>
+                    <p class="text-xs text-gray-600">Catat pendapatan, cicilan utang, dan total aset Anda saat ini.</p>
+                </div>
+
+                <div class="space-y-3 bg-white p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h3 class="text-xs font-bold uppercase text-[#4A3B32]">Arus Kas Bulanan</h3>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Gaji Bulanan (Rp)</label>
+                        <input type="number" x-model.number="formData.gajiBulanan" @input="persist" :disabled="formData.usiaSekarang >= formData.targetPensiun" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm bg-gray-50 disabled:bg-gray-200">
+                        <template x-if="formData.usiaSekarang >= formData.targetPensiun">
+                            <p class="text-[10px] text-amber-600 mt-0.5">ℹ️ Usia ≥ target pensiun, gaji otomatis dikunci Rp 0.</p>
+                        </template>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Penghasilan Sampingan (Rp)</label>
+                        <input type="number" x-model.number="formData.penghasilanSampingan" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Passive Income (Rp)</label>
+                        <input type="number" x-model.number="formData.passiveIncome" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Pengeluaran di luar cicilan (Rp)</label>
+                        <input type="number" x-model.number="formData.pengeluaranRutin" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Cicilan Utang Bulanan (Rp)</label>
+                        <input type="number" x-model.number="formData.cicilanUtang" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Sisa Durasi Cicilan (Bulan)</label>
+                        <input type="number" x-model.number="formData.sisaBulanCicilan" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-[#4A3B32]">Total Hutang (Otomatis)</label>
+                        <input type="text" :value="formatRupiah(totalHutangTab2)" disabled class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm bg-gray-100 font-bold text-[#4A3B32]">
+                    </div>
+                </div>
+
+                <div class="space-y-3 bg-white p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h3 class="text-xs font-bold uppercase text-[#4A3B32]">Aset Hari Ini</h3>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Harta Tunai (Tabungan) (Rp)</label>
+                        <input type="number" x-model.number="formData.hartaTunai" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Harta Investasi (Saham, SBN, Reksadana, Deposito) (Rp)</label>
+                        <input type="number" x-model.number="formData.hartaInvestasi" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-medium text-gray-700">Emas (Gram)</label>
+                            <input type="number" x-model.number="formData.emasGram" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-gray-700">Harga Emas / Gram (Rp)</label>
+                            <input type="number" x-model.number="formData.hargaEmasGram" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Harta Pribadi (Rumah, Kendaraan, dll) (Rp)</label>
+                        <input type="number" x-model.number="formData.hartaPribadi" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <!-- Skor Kesehatan & Indikator -->
+                <div class="bg-[#1A1A1A] text-white p-4 rounded-2xl space-y-2">
+                    <h3 class="text-xs font-bold uppercase text-[#F2B01E]">Ringkasan Skor Kesehatan Finansial</h3>
+                    <div class="flex justify-between text-xs">
+                        <span>Total Aset Bersih:</span>
+                        <strong class="text-[#F2B01E]" x-text="formatRupiah(totalAsetBersih)"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Kelincahan Kekayaan (≥15%):</span>
+                        <strong x-text="kelincahanKekayaan.toFixed(1) + '%'"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Ketahanan Keuangan (>50%):</span>
+                        <strong x-text="ketahananKeuangan.toFixed(1) + '%'"></strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 3: KEBUTUHAN PENSIUN ================= -->
+            <div x-show="tab === 3" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Proyeksi Pengeluaran Masa Pensiun</h2>
+                    <p class="text-xs text-gray-600">Dihitung berdasarkan inflasi tahunan 4% dari pengeluaran saat ini.</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-[#E2DCCD] space-y-3">
+                    <div class="flex justify-between text-xs border-b pb-2">
+                        <span class="text-gray-600">Pengeluaran Bulanan Sekarang:</span>
+                        <strong x-text="formatRupiah(formData.pengeluaranRutin)"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs border-b pb-2">
+                        <span class="text-gray-600">Asumsi Inflasi Tahunan:</span>
+                        <strong>4.0%</strong>
+                    </div>
+                    <div class="flex justify-between text-xs border-b pb-2">
+                        <span class="text-gray-600">Proyeksi Pengeluaran Bulanan Saat Pensiun:</span>
+                        <strong class="text-[#F2B01E] font-bold" x-text="formatRupiah(pengeluaranPensiunBulanan)"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs pt-1">
+                        <span class="text-gray-600">Total Kebutuhan Dana Pensiun Seluruh Durasi:</span>
+                        <strong class="text-[#4A3B32] font-bold text-sm" x-text="formatRupiah(totalKebutuhanDanaPensiun)"></strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 4: KESIAPAN DANA ================= -->
+            <div x-show="tab === 4" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Kesiapan Dana & Realita Dana Darurat</h2>
+                    <p class="text-xs text-gray-600">Validasi total dana cair terhadap target dana darurat dan kebutuhan pensiun.</p>
+                </div>
+
+                <div class="space-y-3 bg-white p-4 rounded-2xl border border-[#E2DCCD]">
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Estimasi JHT (Jaminan Hari Tua) (Rp)</label>
+                        <input type="number" x-model.number="formData.estimasiJHT" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Estimasi DPLK (Rp)</label>
+                        <input type="number" x-model.number="formData.estimasiDPLK" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Estimasi Pesangon (Rp)</label>
+                        <input type="number" x-model.number="formData.estimasiPesangon" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="bg-[#4A3B32] text-[#F0EEE6] p-4 rounded-2xl space-y-2">
+                    <h3 class="text-xs font-bold text-[#F2B01E] uppercase">Evaluasi Kesiapan</h3>
+                    <div class="flex justify-between text-xs">
+                        <span>Total Dana Cair Awal (Tunai + Investasi + Emas + JHT + DPLK + Pesangon):</span>
+                        <strong x-text="formatRupiah(totalDanaCairAwal)"></strong>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Target Dana Darurat (<span x-text="multiplierDD + ' Bulan'"></span>):</span>
+                        <strong class="text-[#F2B01E]" x-text="formatRupiah(targetDanaDarurat)"></strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 5: RENCANA & STRATEGI ================= -->
+            <div x-show="tab === 5" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Rencana & Strategi Pensiun Realistis</h2>
+                    <p class="text-xs text-gray-600">Atur tanggungan dinamis, rencana finansial, modal bisnis, dan Strategi 3 Ember.</p>
+                </div>
+
+                <!-- 1. Tanggungan Setelah Pensiun (Dinamis dengan tombol (+)) -->
+                <div class="bg-white p-4 rounded-2xl border border-[#E2DCCD] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold uppercase text-[#4A3B32]">1. Tanggungan Setelah Pensiun</h3>
+                        <button @click="addTanggungan" class="px-2.5 py-1 bg-[#F2B01E] text-[#1A1A1A] font-bold rounded-lg text-xs">+ Tambah</button>
+                    </div>
+                    <template x-for="(item, index) in formData.listTanggungan" :key="index">
+                        <div class="flex gap-2 items-center bg-[#F0EEE6]/50 p-2.5 rounded-xl border border-[#E2DCCD]">
+                            <select x-model="item.jenis" @change="persist" class="w-1/3 text-xs border border-[#E2DCCD] rounded-lg p-1.5 bg-white">
+                                <option value="Pendidikan Anak">Pendidikan Anak</option>
+                                <option value="Hutang KPR">Hutang KPR</option>
+                                <option value="Tanggungan Lainnya">Tanggungan Lainnya</option>
+                            </select>
+                            <input type="number" x-model.number="item.nominal" @input="persist" placeholder="Nominal Rp" class="w-1/3 text-xs border border-[#E2DCCD] rounded-lg p-1.5 bg-white">
+                            <input type="number" x-model.number="item.sisaBulan" @input="persist" placeholder="Sisa Bln" class="w-1/4 text-xs border border-[#E2DCCD] rounded-lg p-1.5 bg-white">
+                            <button @click="removeTanggungan(index)" class="text-red-500 font-bold px-1.5 text-xs">✕</button>
+                        </div>
+                    </template>
+                    <div class="flex justify-between text-xs font-bold pt-1 border-t">
+                        <span>Total Beban Tanggungan:</span>
+                        <span class="text-[#4A3B32]" x-text="formatRupiah(totalBebanTanggungan)"></span>
+                    </div>
+                </div>
+
+                <!-- 2. Rencana Finansial Khusus (Dinamis dengan tombol (+)) -->
+                <div class="bg-white p-4 rounded-2xl border border-[#E2DCCD] space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold uppercase text-[#4A3B32]">2. Rencana Finansial Khusus</h3>
+                        <button @click="addRencana" class="px-2.5 py-1 bg-[#F2B01E] text-[#1A1A1A] font-bold rounded-lg text-xs">+ Tambah</button>
+                    </div>
+                    <template x-for="(item, index) in formData.listRencana" :key="index">
+                        <div class="flex gap-2 items-center bg-[#F0EEE6]/50 p-2.5 rounded-xl border border-[#E2DCCD]">
+                            <select x-model="item.jenis" @change="persist" class="w-1/2 text-xs border border-[#E2DCCD] rounded-lg p-1.5 bg-white">
+                                <option value="Ibadah Haji/Umroh">Ibadah Haji/Umroh</option>
+                                <option value="Beli Mobil">Beli Mobil</option>
+                                <option value="Beli Rumah">Beli Rumah</option>
+                                <option value="Beli Properti">Beli Properti</option>
+                                <option value="Menikahkan Anak">Menikahkan Anak</option>
+                            </select>
+                            <input type="number" x-model.number="item.nominal" @input="persist" placeholder="Nominal Rp" class="w-1/2 text-xs border border-[#E2DCCD] rounded-lg p-1.5 bg-white">
+                            <button @click="removeRencana(index)" class="text-red-500 font-bold px-1.5 text-xs">✕</button>
+                        </div>
+                    </template>
+                    <div class="flex justify-between text-xs font-bold pt-1 border-t">
+                        <span>Total Rencana Khusus (Pengurang Dana):</span>
+                        <span class="text-[#4A3B32]" x-text="formatRupiah(totalRencanaKhusus)"></span>
+                    </div>
+                </div>
+
+                <!-- 3. Modal Bisnis Sampingan & Arus Kas Tambahan -->
+                <div class="bg-white p-4 rounded-2xl border border-[#E2DCCD] space-y-3">
+                    <h3 class="text-xs font-bold uppercase text-[#4A3B32]">3. Modal & Arus Kas Bisnis Sampingan</h3>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Alokasi Modal Bisnis Sampingan (Rp)</label>
+                        <input type="number" x-model.number="formData.modalBisnisNominal" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm">
+                        <p class="text-[10px] text-gray-500 mt-0.5">Persentase otomatis: <span x-text="persenModalBisnis.toFixed(1) + '%'"></span> dari total dana cair likuid.</p>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-gray-700">Target Profit Bisnis / Bulan (Rp)</label>
+                        <input type="number" x-model.number="formData.targetProfitBisnis" @input="persist" class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm" placeholder="Default 0">
+                        <p class="text-[10px] text-gray-500 mt-0.5">Menambah durasi uji ketahanan arus kas.</p>
+                    </div>
+                </div>
+
+                <!-- 4. The Bucket Strategy (Strategi 3 Ember) -->
+                <div class="bg-white p-4 rounded-2xl border border-[#E2DCCD] space-y-3">
+                    <h3 class="text-xs font-bold uppercase text-[#4A3B32]">4. The Bucket Strategy (Strategi 3 Ember)</h3>
+                    
+                    <div class="bg-[#F0EEE6] p-3 rounded-xl border border-[#E2DCCD] space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-bold text-[#4A3B32]">Ember 1 (Kas Likuid - Dana Darurat):</span>
+                            <span class="font-bold" x-text="formatRupiah(targetDanaDarurat)"></span>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Otomatis terisi untuk dana darurat 12 bulan (sesuai tanggungan).</p>
+                    </div>
+
+                    <div class="bg-[#F0EEE6] p-3 rounded-xl border border-[#E2DCCD] space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-bold text-[#4A3B32]">Ember 2 (Pendapatan / Sukuk SBN):</span>
+                            <span class="font-bold" x-text="formatRupiah(formData.ember2Sukuk)"></span>
+                        </div>
+                        <input type="range" min="0" :max="Math.max(0, totalDanaCairAwal - targetDanaDarurat - formData.modalBisnisNominal)" step="100000" x-model.number="formData.ember2Sukuk" @input="persist" class="w-full accent-[#F2B01E]">
+                        <input type="number" x-model.number="formData.ember2Sukuk" @input="persist" class="w-full px-3 py-1.5 border border-[#E2DCCD] rounded-lg text-xs bg-white">
+                        <p class="text-[10px] text-gray-500">Diisi fleksibel sesuai keinginan penempatan Sukuk SBN.</p>
+                    </div>
+
+                    <!-- Kupon Sukuk & Passive Income tambahan -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-medium text-gray-700">Kupon Sukuk / Tahun (%)</label>
+                            <input type="number" step="0.1" x-model.number="formData.kuponSukukPersen" @input="persist" class="w-full px-2.5 py-2 border border-[#E2DCCD] rounded-xl text-xs" placeholder="Default 0">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-medium text-gray-700">Passive Income Pasca Pensiun (Rp)</label>
+                            <input type="number" x-model.number="formData.passiveIncomePensiun" @input="persist" class="w-full px-2.5 py-2 border border-[#E2DCCD] rounded-xl text-xs" placeholder="Default 0">
+                        </div>
+                    </div>
+
+                    <div class="bg-[#F0EEE6] p-3 rounded-xl border border-[#E2DCCD] space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-bold text-[#4A3B32]">Ember 3 (Pertumbuhan / Emas Batang):</span>
+                            <span class="font-bold text-[#16A34A]" x-text="formatRupiah(ember3Emas)"></span>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Otomatis dari sisa: Total Dana Cair − Ember 1 − Modal Bisnis − Ember 2.</p>
+                    </div>
+                </div>
+
+                <!-- 5. Uji Ketahanan & Grafik Chart.js -->
+                <div class="bg-[#4A3B32] text-[#F0EEE6] p-4 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold uppercase text-[#F2B01E]">5. Hasil Uji Ketahanan Arus Kas</h3>
+                    <div class="flex justify-between text-xs">
+                        <span>Estimasi Ketahanan Dana:</span>
+                        <strong class="text-[#F2B01E]" x-text="hasilKetahananBulan + ' Bulan (' + (hasilKetahananBulan/12).toFixed(1) + ' Tahun)'"></strong>
+                    </div>
+                    <div class="bg-white p-2 rounded-xl">
+                        <canvas id="bucketChart" height="140"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= TAB 6: KESIMPULAN ================= -->
+            <div x-show="tab === 6" class="space-y-4">
+                <div class="bg-[#F0EEE6] p-4 rounded-2xl border border-[#E2DCCD]">
+                    <h2 class="text-sm font-bold text-[#4A3B32] mb-1">Kesimpulan & Rekomendasi AI</h2>
+                    <p class="text-xs text-gray-600">Analisis menyeluruh dari strategi finansial pensiun Anda.</p>
+                </div>
+
+                <!-- Modul AI Gemini Flash Lite -->
+                <div class="bg-white p-4 rounded-2xl border border-[#F2B01E] shadow-sm space-y-3">
+                    <div class="flex items-center space-x-2 border-b pb-2">
+                        <span class="text-lg">🤖</span>
+                        <div>
+                            <h3 class="text-xs font-bold text-[#4A3B32]">Analisis AI Gemini Flash Lite</h3>
+                            <p class="text-[10px] text-gray-500">Evaluasi otomatis strategi 3 Ember & Uji Ketahanan</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-700 leading-relaxed" x-text="aiAnalysisSummary"></p>
+                </div>
+
+                <!-- Saran Likuiditas / Warisan -->
+                <div class="bg-[#1A1A1A] text-white p-4 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-[#F2B01E] uppercase">Rekomendasi Tindakan PRea</h3>
+                    <p class="text-xs leading-relaxed" x-text="rekomendasiLikuidasiAset"></p>
+                </div>
+
+                <!-- Tombol Ekspor PDF -->
+                <div class="space-y-2 pt-2">
+                    <button @click="exportToPDF" class="w-full py-3 bg-[#4A3B32] text-[#F2B01E] font-bold rounded-xl text-xs hover:bg-[#1A1A1A] transition shadow flex items-center justify-center space-x-2">
+                        <span>📥 Cetak / Simpan PDF Ringkasan Eksekutif</span>
+                    </button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <footer class="bg-white border-t border-[#E2DCCD] p-3 flex justify-between items-center text-xs">
+            <button @click="prevTab" :disabled="tab === 1" class="px-4 py-2 bg-[#F0EEE6] text-[#4A3B32] rounded-xl font-bold disabled:opacity-30">← Kembali</button>
+            <span class="font-bold text-[#4A3B32]" x-text="'Tab ' + tab + ' dari 6'"></span>
+            <button @click="nextTab" :disabled="tab === 6" class="px-4 py-2 bg-[#4A3B32] text-[#F2B01E] rounded-xl font-bold disabled:opacity-30">
+                <span x-text="tab === 5 ? 'Lihat Kesimpulan' : 'Lanjut →'"></span>
+            </button>
+        </footer>
+
+    </div>
+
+    <script>
         document.addEventListener('alpine:init', () => {
             Alpine.data('preaCalculator', () => ({
                 // Gerbang Keamanan (Access Gate)
                 isUnlocked: localStorage.getItem('prea_unlocked') === 'true',
                 inputCode: '',
                 codeError: false,
-                correctCode: 'prea123', // <-- Password diatur menjadi prea123
+                correctCode: 'prea123',
 
                 verifyCode() {
                     if (this.inputCode.trim().toLowerCase() === this.correctCode.toLowerCase()) {
@@ -251,3 +713,5 @@
             }));
         });
     </script>
+</body>
+</html>
