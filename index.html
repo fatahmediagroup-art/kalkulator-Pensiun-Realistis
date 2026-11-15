@@ -124,7 +124,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-[#4A3B32] mb-1">Jumlah Orang yang Ditanggung (Org)</label>
+                        <label class="block text-xs font-bold text-[#4A3B32] mb-1">Jml orang yg ditanggung (diri sendiri termasuk)</label>
                         <input type="number" min="0" x-model.number="formData.tanggunganOrg" @input="persist" placeholder="0"
                                class="w-full px-3.5 py-2.5 border border-[#E2DCCD] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#F2B01E]">
                         <p class="text-[11px] text-gray-500 mt-1">
@@ -186,6 +186,14 @@
                         <template x-if="isRetiredAge">
                             <p class="text-[10px] text-amber-700 font-medium mt-1">Usia saat ini &ge; target pensiun, gaji otomatis dikunci Rp 0.</p>
                         </template>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-700 mb-1">Kemampuan Menabung / Bulan (Rp)</label>
+                        <input type="text" inputmode="numeric" placeholder="0"
+                               :value="formatNumber(formData.kemampuanMenabung)"
+                               @input="formData.kemampuanMenabung = parseNumber($event.target.value); $event.target.value = formatNumber(formData.kemampuanMenabung); persist()"
+                               class="w-full px-3 py-2 border border-[#E2DCCD] rounded-xl text-sm font-semibold">
                     </div>
 
                     <div class="grid grid-cols-2 gap-2.5">
@@ -322,12 +330,19 @@
                     </div>
 
                     <div class="space-y-1.5 pt-1">
-                        <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">7 Indikator Kesehatan PRea:</div>
+                        <div class="flex flex-wrap justify-between items-center gap-1">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">7 Indikator Kesehatan PRea:</span>
+                            <div class="flex items-center space-x-2 text-[9px] font-semibold">
+                                <span class="text-[#16A34A]">● Aman</span>
+                                <span class="text-[#F2B01E]">● Hati-hati</span>
+                                <span class="text-red-400">● Perlu ditangani</span>
+                            </div>
+                        </div>
                         <template x-for="(ind, idx) in indikatorKesehatanList" :key="idx">
-                            <div class="flex justify-between items-center text-[11px] bg-white/5 px-2.5 py-1.5 rounded-lg">
-                                <span x-text="ind.label"></span>
-                                <span :class="!hasAnyFinancialData ? 'text-gray-400' : (ind.sehat ? 'text-[#16A34A] font-bold' : 'text-amber-400 font-bold')"
-                                      x-text="!hasAnyFinancialData ? '-' : (ind.nilai + (ind.sehat ? ' ✓' : ' !'))"></span>
+                            <div class="flex justify-between items-center gap-2 text-[11px] bg-white/5 px-2.5 py-2 rounded-lg">
+                                <span class="text-gray-200" x-text="ind.label"></span>
+                                <span :class="!hasAnyFinancialData ? 'text-gray-400' : ind.warnaClass + ' font-bold text-right'"
+                                      x-text="!hasAnyFinancialData ? '-' : ind.statusText"></span>
                             </div>
                         </template>
                     </div>
@@ -475,7 +490,7 @@
                                     <option value="Hutang KPR">Hutang KPR</option>
                                     <option value="Tanggungan lainnya">Tanggungan lainnya</option>
                                 </select>
-                                <button @click="removeTanggungan(index)" class="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg text-xs">✕</button>
+                                <button @click="removeTanggungan(index)" title="Hapus" class="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg text-xs">✕</button>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <div>
@@ -531,7 +546,7 @@
                                     <option value="Beli Properti">Beli Properti</option>
                                     <option value="Menikahkan Anak">Menikahkan Anak</option>
                                 </select>
-                                <button @click="removeRencana(index)" class="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg text-xs">✕</button>
+                                <button @click="removeRencana(index)" title="Hapus" class="text-red-600 hover:bg-red-50 font-bold px-2 py-1 rounded-lg text-xs">✕</button>
                             </div>
                             <div>
                                 <span class="text-[10px] text-gray-500 block">Nominal Kebutuhan (Rp)</span>
@@ -548,7 +563,7 @@
                         <span class="text-[#4A3B32]" x-text="formatRupiah(totalRencanaKhusus)"></span>
                     </div>
                     <template x-if="totalRencanaKhusus > totalDanaCairBruto && totalRencanaKhusus > 0">
-                        <p class="text-[11px] text-red-600 font-semibold">⚠️ Total rencana khusus melebihi total dana cair bruto Anda!</p>
+                        <p class="text-[11px] text-red-600 font-semibold">Total rencana khusus melebihi total dana cair bruto Anda!</p>
                     </template>
                 </div>
 
@@ -746,6 +761,7 @@
                     return {
                         nama: '',
                         tanggunganOrg: '',
+                        kemampuanMenabung: '',
                         usiaSekarang: '',
                         targetPensiun: '',
                         harapanHidup: '',
@@ -909,18 +925,24 @@
 
                 get totalAsetKotor() {
                     return (Number(this.formData.hartaTunai) || 0) +
+                           (Number(this.formData.hartaPribadi) || 0) +
                            (Number(this.formData.hartaInvestasi) || 0) +
-                           this.nilaiTotalEmas +
-                           (Number(this.formData.hartaPribadi) || 0);
+                           this.nilaiTotalEmas;
                 },
 
                 get totalAsetBersih() {
                     return this.totalAsetKotor - this.totalHutangTab2;
                 },
 
+                get rasioHartaMenghasilkan() {
+                    const hartaInvestasi = Number(this.formData.hartaInvestasi) || 0;
+                    const nilaiEmas = this.nilaiTotalEmas;
+                    return this.totalAsetBersih > 0 ? ((hartaInvestasi + nilaiEmas) / this.totalAsetBersih) * 100 : 0;
+                },
+
                 get kelincahanKekayaan() {
-                    const asetLikuid = (Number(this.formData.hartaTunai) || 0) + (Number(this.formData.hartaInvestasi) || 0) + this.nilaiTotalEmas;
-                    return this.totalAsetBersih > 0 ? (asetLikuid / this.totalAsetBersih) * 100 : 0;
+                    const hartaTunai = Number(this.formData.hartaTunai) || 0;
+                    return this.totalAsetBersih > 0 ? (hartaTunai / this.totalAsetBersih) * 100 : 0;
                 },
 
                 get ketahananKeuangan() {
@@ -931,29 +953,86 @@
                     return this.totalPemasukanBulanan > 0 ||
                            this.totalPengeluaranBulananSekarang > 0 ||
                            this.totalAsetKotor > 0 ||
-                           this.totalHutangTab2 > 0;
+                           this.totalHutangTab2 > 0 ||
+                           (Number(this.formData.kemampuanMenabung) || 0) > 0;
                 },
 
                 get indikatorKesehatanList() {
-                    const pemasukan = this.totalPemasukanBulanan;
-                    const pengeluaranTotal = this.totalPengeluaranBulananSekarang;
-                    const surplus = pemasukan - pengeluaranTotal;
-                    const savingRatio = pemasukan > 0 ? (surplus / pemasukan) * 100 : (surplus > 0 ? 100 : 0);
-                    const ddTargetAktif = pengeluaranTotal * this.multiplierDD;
-                    const cicilan = Number(this.formData.cicilanUtang) || 0;
-                    const dsr = pemasukan > 0 ? (cicilan / pemasukan) * 100 : (cicilan === 0 ? 0 : 100);
+            const pemasukan = this.totalPemasukanBulanan;
+            const gaji = this.isRetiredAge ? 0 : (Number(this.formData.gajiBulanan) || 0);
+            const tabunganBulan = Number(this.formData.kemampuanMenabung) || 0;
+            const savingRatio = gaji > 0 ? (tabunganBulan / gaji) * 100 : (tabunganBulan > 0 ? 100 : 0);
+
+            // Target Dana Darurat = (Pengeluaran Bulanan + Cicilan Utang per Bulan) x Multiplier Bulan
+            const ddTargetAktif = this.totalPengeluaranBulananSekarang * this.multiplierDD;
+            const hartaTunai = Number(this.formData.hartaTunai) || 0;
+            const defisitDD = Math.max(0, ddTargetAktif - hartaTunai);
+
+            const cicilan = Number(this.formData.cicilanUtang) || 0;
+            const dsr = pemasukan > 0 ? (cicilan / pemasukan) * 100 : (cicilan === 0 ? 0 : 100);
+
+            const hartaMenghasilkan = this.rasioHartaMenghasilkan;
                     const kelincahan = this.kelincahanKekayaan;
                     const ketahanan = this.ketahananKeuangan;
-                    const proteksi = this.formData.proteksiKesehatan !== '' && this.formData.proteksiKesehatan !== 'Belum Ada';
+                    const proteksi = this.formData.proteksiKesehatan || '';
 
                     return [
-                        { label: '1. Surplus Arus Kas', nilai: this.formatRupiah(surplus), sehat: surplus >= 0 },
-                        { label: '2. Rasio Tabungan (>=10%)', nilai: savingRatio.toFixed(1) + '%', sehat: savingRatio >= 10 },
-                        { label: '3. Dana Darurat (' + this.multiplierDD + ' Bln)', nilai: ((Number(this.formData.hartaTunai) || 0) >= ddTargetAktif && ddTargetAktif > 0 ? 'Terpenuhi' : 'Kurang'), sehat: (Number(this.formData.hartaTunai) || 0) >= ddTargetAktif && ddTargetAktif > 0 },
-                        { label: '4. Rasio Cicilan (<=30%)', nilai: dsr.toFixed(1) + '%', sehat: dsr <= 30 },
-                        { label: '5. Kelincahan Kekayaan (>=15%)', nilai: kelincahan.toFixed(1) + '%', sehat: kelincahan >= 15 },
-                        { label: '6. Ketahanan Keuangan (>50%)', nilai: ketahanan.toFixed(1) + '%', sehat: ketahanan > 50 },
-                        { label: '7. Proteksi Kesehatan', nilai: this.formData.proteksiKesehatan || 'Belum Diisi', sehat: proteksi }
+                        {
+                            label: '1. Rasio Tabungan (>=10%)',
+                            ...(savingRatio >= 10
+                                ? { statusText: savingRatio.toFixed(1) + '% • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : savingRatio > 0
+                                    ? { statusText: savingRatio.toFixed(1) + '% • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: savingRatio.toFixed(1) + '% • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '2. Dana Darurat (' + this.multiplierDD + ' Bln)',
+                            ...(ddTargetAktif > 0 && hartaTunai >= ddTargetAktif
+                                ? { statusText: 'Terpenuhi • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : hartaTunai > 0
+                                    ? { statusText: 'Kurang ' + this.formatRupiah(defisitDD) + ' • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: 'Kurang ' + this.formatRupiah(defisitDD) + ' • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '3. Rasio Cicilan (<=30%)',
+                            ...(dsr <= 30
+                                ? { statusText: dsr.toFixed(1) + '% • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : dsr <= 40
+                                    ? { statusText: dsr.toFixed(1) + '% • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: dsr.toFixed(1) + '% • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '4. Harta yang Menghasilkan (>50%)',
+                            ...(hartaMenghasilkan > 50
+                                ? { statusText: hartaMenghasilkan.toFixed(1) + '% • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : hartaMenghasilkan >= 25
+                                    ? { statusText: hartaMenghasilkan.toFixed(1) + '% • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: hartaMenghasilkan.toFixed(1) + '% • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '5. Kelincahan Kekayaan (>=15%)',
+                            ...(kelincahan >= 15
+                                ? { statusText: kelincahan.toFixed(1) + '% • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : kelincahan >= 5
+                                    ? { statusText: kelincahan.toFixed(1) + '% • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: kelincahan.toFixed(1) + '% • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '6. Ketahanan Keuangan (>50%)',
+                            ...(ketahanan > 50
+                                ? { statusText: ketahanan.toFixed(1) + '% • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : ketahanan >= 30
+                                    ? { statusText: ketahanan.toFixed(1) + '% • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: ketahanan.toFixed(1) + '% • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        },
+                        {
+                            label: '7. Proteksi Kesehatan',
+                            ...(proteksi !== '' && proteksi !== 'Belum Ada'
+                                ? { statusText: proteksi + ' • Aman', warnaClass: 'text-[#16A34A]', sehat: true }
+                                : proteksi === ''
+                                    ? { statusText: 'Belum Diisi • Hati-hati', warnaClass: 'text-[#F2B01E]', sehat: false }
+                                    : { statusText: 'Belum Ada • Perlu ditangani', warnaClass: 'text-red-400', sehat: false })
+                        }
                     ];
                 },
 
@@ -1294,7 +1373,7 @@
 
                     if (hasilBulan >= targetBulan) {
                         const estimasiWarisan = this.simulasiHasil.sisaAkhirEmber + this.modalBisnisValid + (Number(this.formData.hartaPribadi) || 0);
-                        return `<p class="text-sm font-extrabold text-[#16A34A]">👏🏻 Selamat! Dana Pensiun Anda Surplus & Melampaui Angka Harapan Hidup.</p>
+                        return `<p class="text-sm font-extrabold text-[#16A34A]">Selamat! Dana Pensiun Anda Surplus & Melampaui Angka Harapan Hidup.</p>
                                 <p>Arus kas Anda aman hingga akhir usia harapan hidup (${this.formData.harapanHidup} tahun) dan berpotensi meninggalkan warisan bernilai sekitar <strong>${this.formatRupiah(estimasiWarisan)}</strong> (termasuk aset properti pribadi & sisa dana investasi) untuk anak cucu.</p>`;
                     } else {
                         const bulanKurang = targetBulan - hasilBulan;
@@ -1360,7 +1439,8 @@
 
                     addSection('2. Cek Kesehatan Finansial & Neraca', [
                         `Skor Kesehatan Finansial: ${this.skorKesehatan}/100 | Kekayaan Bersih: ${this.formatRupiah(this.totalAsetBersih)}`,
-                        `Total Hutang (Informatif): ${this.formatRupiah(this.totalHutangTab2)} | Kelincahan Kekayaan: ${this.kelincahanKekayaan.toFixed(1)}% | Ketahanan Keuangan: ${this.ketahananKeuangan.toFixed(1)}%`
+                        `Total Hutang (Informatif): ${this.formatRupiah(this.totalHutangTab2)} | Harta yang Menghasilkan: ${this.rasioHartaMenghasilkan.toFixed(1)}%`,
+                        `Kelincahan Kekayaan: ${this.kelincahanKekayaan.toFixed(1)}% | Ketahanan Keuangan: ${this.ketahananKeuangan.toFixed(1)}%`
                     ]);
 
                     addSection('3. Kebutuhan & Kesiapan Dana Pensiun', [
